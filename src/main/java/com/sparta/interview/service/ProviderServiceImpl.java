@@ -6,6 +6,7 @@ import com.sparta.interview.domain.Sensor;
 import com.sparta.interview.persistence.service.ProviderPersistenceService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedInputStream;
@@ -16,8 +17,8 @@ import java.util.*;
 import java.util.zip.CRC32;
 
 @Service("providerService")
-@AllArgsConstructor
 @Slf4j
+@AllArgsConstructor
 public class ProviderServiceImpl implements ProviderService {
 
   private ProviderPersistenceService providerPersistenceMapService;
@@ -43,6 +44,7 @@ public class ProviderServiceImpl implements ProviderService {
     log.info("Number of records " + numberOfRecords);
     for (int i = 0; i < numberOfRecords; i++) {
       Record record = new Record();
+      log.info("Record number: "+mainReader.readLong());
       record.setTimestamp(mainReader.readLong());
       record.setCity(readString(mainReader, mainReader.readInt()));
       record.setSensorList(readSensors(mainReader));
@@ -58,7 +60,7 @@ public class ProviderServiceImpl implements ProviderService {
     byte[] sensorsData = dis.readNBytes(lengthOfSensor);
     DataInputStream sensorsReader = getInputStream(sensorsData);
 
-    checkCrc32(dis, sensorsData);
+    extracted(dis, sensorsData);
     List<Sensor> sensors = new LinkedList<>();
     int numberOfSensors = sensorsReader.readInt();
     for (int i = 0; i < numberOfSensors; i++) {
@@ -72,10 +74,10 @@ public class ProviderServiceImpl implements ProviderService {
     return sensors;
   }
 
-  private void checkCrc32(DataInputStream dis, byte[] sensorsData) throws IOException {
+  private void extracted(DataInputStream dis, byte[] sensorsData) throws IOException {
     CRC32 crc32 = new CRC32();
     crc32.update(sensorsData);
-    if (crc32.getValue() != dis.readLong()) {
+    if (crc32.getValue() != dis.readLong()){
       throw new RuntimeException("Data is wrong");
     }
   }
