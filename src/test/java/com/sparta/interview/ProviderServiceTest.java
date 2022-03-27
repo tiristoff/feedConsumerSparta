@@ -1,7 +1,10 @@
 package com.sparta.interview;
 
+import com.sparta.interview.domain.Provider;
+import com.sparta.interview.domain.Sensor;
 import com.sparta.interview.persistence.service.ProviderPersistenceMapServiceImpl;
 import com.sparta.interview.service.ProviderServiceImpl;
+import com.sparta.interview.utils.DataProvider;
 import org.junit.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -14,7 +17,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.*;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 
@@ -27,53 +31,57 @@ public class ProviderServiceTest {
 
   @InjectMocks private ProviderServiceImpl providerService;
   @Mock private ProviderPersistenceMapServiceImpl providerPersistenceMapService;
-  private final static String[] cities = {"Leon", "Barcelona", "Albacete", "Menorca", "Zaragoza"};
-
 
   private static byte[] getContent() throws IOException {
     final ByteArrayOutputStream baos = new ByteArrayOutputStream();
     final BufferedOutputStream mainBos = new BufferedOutputStream(baos);
     final DataOutputStream dataOutputStream = new DataOutputStream(mainBos);
 
-    final Random rnd = new Random();
-    final long records = rnd.nextInt(26) + 5;
+    final Provider provider = DataProvider.getProvider(null);
 
-    dataOutputStream.writeLong(records);
+    dataOutputStream.writeLong(provider.getRecords().size());
 
-    for (int i = 0; i < records; i++) {
+    for (int i = 0; i < provider.getRecords().size(); i++) {
       dataOutputStream.writeLong(i);
       dataOutputStream.writeLong(new Date().getTime());
-      final String city = cities[rnd.nextInt(5)];
-      dataOutputStream.writeInt(city.getBytes().length);
-      dataOutputStream.write(city.getBytes());
+      writeSting(dataOutputStream, provider.getRecords().get(i).getCity().getBytes());
 
-      final ByteArrayOutputStream sensorArrayStream = new ByteArrayOutputStream();
-      final BufferedOutputStream bos = new BufferedOutputStream(sensorArrayStream);
-      final DataOutputStream sensorOutputStream = new DataOutputStream(bos);
-
-      final Map<String, Integer> sensors = new HashMap<>();
-      final long numberOfSensors = rnd.nextInt(11);
-      for (int j = 0; j < numberOfSensors; j++) {
-        sensors.put(UUID.randomUUID().toString(), rnd.nextInt(401) + 50);
-      }
-      sensorOutputStream.writeInt(sensors.size());
-
-      for (Map.Entry<String, Integer> entrySet : sensors.entrySet()) {
-        sensorOutputStream.writeInt(entrySet.getKey().getBytes().length);
-        sensorOutputStream.write(entrySet.getKey().getBytes());
-        sensorOutputStream.writeInt(entrySet.getValue());
-      }
-      sensorOutputStream.flush();
-      final byte[] sensorCollection = sensorArrayStream.toByteArray();
+      final byte[] sensorCollection = writeSensorCollection(provider.getRecords().get(i).getSensorList());
       dataOutputStream.writeInt(sensorCollection.length);
       dataOutputStream.write(sensorCollection);
-      final CRC32 crc32 = new CRC32();
-      crc32.update(sensorCollection);
-      dataOutputStream.writeLong(crc32.getValue());
+      writeCrc32(dataOutputStream, sensorCollection);
     }
     dataOutputStream.flush();
 
     return baos.toByteArray();
+  }
+
+  private static byte[] writeSensorCollection(List<Sensor> sensors) throws IOException {
+
+    final ByteArrayOutputStream sensorArrayStream = new ByteArrayOutputStream();
+    final BufferedOutputStream bos = new BufferedOutputStream(sensorArrayStream);
+    final DataOutputStream sensorOutputStream = new DataOutputStream(bos);
+
+    sensorOutputStream.writeInt(sensors.size());
+
+    for (Sensor sensor : sensors) {
+      writeSting(sensorOutputStream,sensor.getId().getBytes());
+      sensorOutputStream.writeInt(sensor.getMeasure());
+    }
+    sensorOutputStream.flush();
+    return sensorArrayStream.toByteArray();
+  }
+
+  private static void writeCrc32(DataOutputStream dataOutputStream, byte[] sensorCollection)
+      throws IOException {
+    final CRC32 crc32 = new CRC32();
+    crc32.update(sensorCollection);
+    dataOutputStream.writeLong(crc32.getValue());
+  }
+
+  private static void writeSting(DataOutputStream dos, byte[] string) throws IOException {
+    dos.writeInt(string.length);
+    dos.write(string);
   }
 
   private static Stream<Arguments> parameters() throws IOException {
@@ -111,6 +119,8 @@ public class ProviderServiceTest {
     providerService.loadProvider(provider, content);
     providerService.totalRecords(provider);
 
-    BDDMockito.then(providerPersistenceMapService).should(BDDMockito.times(1)).totalRecordsOfProvider(provider);
+    BDDMockito.then(providerPersistenceMapService)
+        .should(BDDMockito.times(1))
+        .totalRecordsOfProvider(provider);
   }
 }
