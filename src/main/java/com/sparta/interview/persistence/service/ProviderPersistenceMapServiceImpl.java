@@ -3,21 +3,21 @@ package com.sparta.interview.persistence.service;
 import com.sparta.interview.domain.Provider;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 @Service("providerPersistenceMapService")
 public class ProviderPersistenceMapServiceImpl implements ProviderPersistenceService {
 
-  Map<String, Provider> providerMap = new HashMap<>();
+  private final List<Provider> providers = new LinkedList<>();
 
   @Override
   public void storeData(Provider provider) {
-    Provider storedProvider = providerMap.get(provider.getName());
+    final Provider storedProvider = findExistingProvider(provider.getName());
     if (storedProvider == null) {
-      providerMap.put(provider.getName(), provider);
+      providers.add(provider);
     } else {
       storedProvider.getRecords().addAll(provider.getRecords());
     }
@@ -25,13 +25,17 @@ public class ProviderPersistenceMapServiceImpl implements ProviderPersistenceSer
 
   @Override
   public Provider getProviderByName(String provider) {
-    return providerMap.get(provider);
+    return findExistingProvider(provider);
   }
 
   @Override
   public int totalRecordsOfProvider(String provider) {
     return Optional.ofNullable(getProviderByName(provider).getRecords())
-        .orElse(new LinkedList<>())
+        .orElse(new ArrayList<>())
         .size();
+  }
+
+  private Provider findExistingProvider(String provider) {
+    return providers.stream().filter(p -> p.getName().equals(provider)).findFirst().orElse(null);
   }
 }

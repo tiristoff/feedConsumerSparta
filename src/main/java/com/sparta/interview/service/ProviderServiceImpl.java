@@ -6,14 +6,13 @@ import com.sparta.interview.domain.Sensor;
 import com.sparta.interview.persistence.service.ProviderPersistenceService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.zip.CRC32;
 
 @Service("providerService")
@@ -25,6 +24,9 @@ public class ProviderServiceImpl implements ProviderService {
 
   @Override
   public int loadProvider(String provider, byte[] content) throws IOException {
+    if (null == content || content.length == 0){
+       return 0;
+    }
     Provider providerDomain = readData(provider, content);
     providerPersistenceMapService.storeData(providerDomain);
     return providerDomain.getRecords().size();
@@ -37,13 +39,13 @@ public class ProviderServiceImpl implements ProviderService {
 
   private Provider readData(String provider, byte[] content) throws IOException {
 
-    DataInputStream mainReader = getInputStream(content);
-    Provider providerDomain = Provider.builder().records(new LinkedList<>()).name(provider).build();
+    final DataInputStream mainReader = getInputStream(content);
+    final Provider providerDomain = Provider.builder().records(new LinkedList<>()).name(provider).build();
 
-    long numberOfRecords = mainReader.readLong();
+    final long numberOfRecords = mainReader.readLong();
     log.info("Number of records " + numberOfRecords);
     for (int i = 0; i < numberOfRecords; i++) {
-      Record record = new Record();
+      final Record record = new Record();
       log.info("Record number: "+mainReader.readLong());
       record.setTimestamp(mainReader.readLong());
       record.setCity(readString(mainReader, mainReader.readInt()));
@@ -54,15 +56,15 @@ public class ProviderServiceImpl implements ProviderService {
     return providerDomain;
   }
 
-  private List<Sensor> readSensors(DataInputStream dis) throws IOException {
+  private List<Sensor> readSensors (DataInputStream dis) throws IOException {
 
-    int lengthOfSensor = dis.readInt();
-    byte[] sensorsData = dis.readNBytes(lengthOfSensor);
-    DataInputStream sensorsReader = getInputStream(sensorsData);
+    final int lengthOfSensor = dis.readInt();
+    final byte[] sensorsData = dis.readNBytes(lengthOfSensor);
+    final DataInputStream sensorsReader = getInputStream(sensorsData);
 
-    extracted(dis, sensorsData);
-    List<Sensor> sensors = new LinkedList<>();
-    int numberOfSensors = sensorsReader.readInt();
+    testCrc32(dis, sensorsData);
+    final List<Sensor> sensors = new LinkedList<>();
+    final int numberOfSensors = sensorsReader.readInt();
     for (int i = 0; i < numberOfSensors; i++) {
       sensors.add(
           Sensor.builder()
@@ -74,8 +76,8 @@ public class ProviderServiceImpl implements ProviderService {
     return sensors;
   }
 
-  private void extracted(DataInputStream dis, byte[] sensorsData) throws IOException {
-    CRC32 crc32 = new CRC32();
+  private void testCrc32(DataInputStream dis, byte[] sensorsData) throws IOException {
+    final CRC32 crc32 = new CRC32();
     crc32.update(sensorsData);
     if (crc32.getValue() != dis.readLong()){
       throw new RuntimeException("Data is wrong");
@@ -83,7 +85,7 @@ public class ProviderServiceImpl implements ProviderService {
   }
 
   private DataInputStream getInputStream(byte[] content) {
-    return new DataInputStream(new BufferedInputStream(new ByteArrayInputStream(content)));
+    return new DataInputStream(new ByteArrayInputStream(content));
   }
 
   private String readString(DataInputStream dis, int lengthOfString) throws IOException {
